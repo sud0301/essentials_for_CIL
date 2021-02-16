@@ -1,3 +1,8 @@
+*.tar.gz
+data/cifar-100-python/
+output/
+*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

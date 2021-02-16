@@ -1,0 +1,10 @@
+torch
+torchvision
+numpy
+scipy
+scikit-learn
+Pillow==6.2.2
+argparse
+matplotlib
+opencv-python
+
