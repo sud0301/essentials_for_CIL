@@ -1,8 +1,6 @@
 # Essentials for Class Incremental Learning
 Official repository of the paper 'Essentials for Class Incremental Learning'
 
-# Semi-supevised Semantic Segmentation with High- and Low-level Consistency
-
 This Pytorch repository contains the code for our work [Essentials for Class Incremental Learning](https://arxiv.org/pdf/---.pdf). 
 
 This work presents a straightforward class-incrmental learning system that focuses on the essential components and already exceeds the state of the art without integrating sophisticated modules. 
@@ -42,6 +40,21 @@ bash ./scripts/run_imagenet1k_w_sd.sh
 | CCIL               |     66.44           |      64.86        |
 | CCIL + SD          |     67.17           |      65.86        |
 
+
+## Results (ImageNet-100)
+
+| Model name         | Avg Acc (5 iTasks)  | Avg Acc (10 iTasks) |
+| ------------------ |------------------   | ----------------- |
+| CCIL               |     77.99           |      75.99        |
+| CCIL + SD          |     79.44           |      76.77        |
+
+
+## Results (ImageNet)
+
+| Model name         | Avg Acc (5 iTasks)  | Avg Acc (10 iTasks) |
+| ------------------ |------------------   | ----------------- |
+| CCIL               |     67.53           |      65.61        |
+| CCIL + SD          |     68.04           |      66.25        |
 
 ## List of Arguments
 
