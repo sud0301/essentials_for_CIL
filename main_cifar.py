@@ -40,7 +40,7 @@ def parse_option():
     # incremental learning    
     parser.add_argument('--new-classes', type=int, default=10, help='number of classes in new task')
     parser.add_argument('--start-classes', type=int, default=50, help='number of classes in old task')
-    parser.add_argument('--exemplar_size', type=int, default=2000, help='2000 exemplars for CIFAR-100')
+    parser.add_argument('--K', type=int, default=2000, help='2000 exemplars for CIFAR-100')
 
     # optimization
     parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
@@ -153,7 +153,6 @@ def train(model, old_model, epoch, lr, tempature, lamda, train_loader, use_sd, c
 
             # Classification Loss: New task
             x, target = x.cuda(), target.cuda()
-            x, target = Variable(x), Variable(target)
             
             targets = target-len(test_classes)+CLASS_NUM_IN_BATCH
 
@@ -262,8 +261,6 @@ def evaluate_net(model, transform, train_classes, test_classes):
     correct = 0.0
     compute_means = True
     for j, (_, images, labels) in enumerate(train_loader):
-        #images = Variable(images).cuda()
-        #image = images.cuda()
         _, preds = torch.max(torch.softmax(model(images.cuda()), dim=1), dim=1, keepdim=False)
         labels = [y.item() for y in labels]
         np.asarray(labels)
@@ -285,7 +282,6 @@ def evaluate_net(model, transform, train_classes, test_classes):
     total = 0.0
     correct = 0.0
     for j, (_, images, labels) in enumerate(test_loader):
-        #images = Variable(images).cuda()
         out = torch.softmax(model(images.cuda()), dim=1)
         _, preds = torch.max(out, dim=1, keepdim=False)
         labels = [y.item() for y in labels]
@@ -362,7 +358,7 @@ if __name__ == '__main__':
     TOTAL_CLASS_BATCH_NUM = TOTAL_CLASS_NUM // CLASS_NUM_IN_BATCH
     T = args.T
 
-    K = args.exemplar_size
+    K = args.K
     exemplar_sets = []
     exemplar_means = []    
     compute_means = True

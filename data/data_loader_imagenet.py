@@ -45,7 +45,7 @@ class Exemplar1K(Dataset):
         self.train_data = []
         self.test_data = []
 
-        f = open('class_folder_list.txt', 'r')
+        f = open('./data/class_folder_list.txt', 'r')
         lines=f.readlines()
         dir_list=[]
         for x in lines:
@@ -119,7 +119,7 @@ class ImageNet1K(Dataset):
         self.train_data = []
         self.test_data = []
 
-        f = open('class_folder_list.txt', 'r')
+        f = open('./data/class_folder_list.txt', 'r')
         lines=f.readlines()
         dir_list=[]
         for x in lines:
@@ -192,7 +192,7 @@ class ImageNet100(Dataset):
         self.test_data = []
 
         # ImageNet-100
-        f=open('imagenet100_s1993.txt',"r")
+        f=open('./data/imagenet100_s1993.txt',"r")
         lines=f.readlines()
         dir_list=[]
         for x in lines:

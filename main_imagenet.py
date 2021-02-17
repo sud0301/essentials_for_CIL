@@ -20,8 +20,8 @@ import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
 
 from models import *
-from data_loader import ExemplarDataset
-from data_loader_imagenet import ImageNet100, ImageNet1K
+from data.data_loader_imagenet import ExemplarDataset
+from data.data_loader_imagenet import ImageNet100, ImageNet1K
 
 from lib.util import moment_update, TransformTwice, weight_norm, weight_norm_dot, mixup_data, mixup_criterion, LabelSmoothingCrossEntropy
 
@@ -29,8 +29,6 @@ compute_means=True
 exemplar_means_= []
 avg_acc = []
 exemplar_sets = []
-resume_used = False
-resume_cls = 0
 
 def parse_option():
     parser = argparse.ArgumentParser('argument for training')
@@ -57,8 +55,8 @@ def parse_option():
     parser.add_argument('--cosine', action='store_true', help='use cosine learning rate')
 
     # root folders
-    parser.add_argument('--train-data-root', type=str, default='./data/train', help='root directory of dataset')
-    parser.add_argument('--test-data-root', type=str, default='./data/test', help='root directory of dataset')
+    parser.add_argument('--train-data-root', type=str, default='./data', help='root directory of dataset')
+    parser.add_argument('--test-data-root', type=str, default='./data', help='root directory of dataset')
     parser.add_argument('--output-root', type=str, default='./output', help='root directory for output')
 
     # dataset
@@ -66,8 +64,6 @@ def parse_option():
 
     # save and load
     parser.add_argument('--exp-name', type=str, default='kd', help='experiment name')
-    parser.add_argument('--resume', action='store_true', help='resume from checkpoint of first task')
-    parser.add_argument('--resume-path', type=str, default='./checkpoint_0.pth',)
     parser.add_argument('--save', action='store_true', help='to save checkpoint')
 
     # loss function
@@ -97,36 +93,6 @@ def parse_option():
     args = parser.parse_args()
     return args
 
-
-def load_checkpoint(args, model, old_model, optimizer, scheduler, exemplar_sets, resume_cls, current_cls):
-    print("=> loading checkpoint '{}'".format(args.resume_path))
-
-    #global exemplar_sets
-    checkpoint = torch.load(args.resume_path, map_location='cpu')
-    args.start_epoch = checkpoint['epoch'] + 1
-    resume_cls = checkpoint['classes']
-    print ('resume_cls: ',resume_cls, ' current_cls: ', current_cls)
-    resume_used=False
-
-    #if ((args.start_epoch == (args.epochs+1)) and ((resume_cls+10) == current_cls)) or resume_cls == current_cls:
-    if resume_cls == current_cls:
-        #print ('start epoch: ', args.start_epoch, 'test_classes: ', cls)
-        model.load_state_dict(checkpoint['model'])
-        old_model.load_state_dict(checkpoint['old_model'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
-        exemplar_sets = checkpoint['exemplars']
-        #print ('exemplar sets length: ', exemplar_sets[0].shape)
-        resume_used = True
-
-        print("=> loaded successfully '{}' (epoch {})".format(args.resume_path, checkpoint['epoch']))
-
-        del checkpoint
-        torch.cuda.empty_cache()
-
-    return resume_cls, resume_used, exemplar_sets
-
-
 def save_checkpoint(args, epoch, model, old_model, exemplar_sets, optimizer, scheduler, classes, save_path, use_sd):
     print('==> Saving...')
     state = {
@@ -142,7 +108,7 @@ def save_checkpoint(args, epoch, model, old_model, exemplar_sets, optimizer, sch
     if epoch % 5  ==0:
         torch.save(state, os.path.join(save_path, 'current.pth'))
     if epoch % args.save_freq == 0 or epoch ==1:
-        if use_sd ==100:
+        if use_sd:
             torch.save(state, os.path.join(save_path, f'ckpt_epoch{classes}' + f'_sd_{epoch}.pth'))
         else:
             torch.save(state, os.path.join(save_path, f'ckpt_epoch{classes}' + f'_{epoch}.pth'))
@@ -150,8 +116,7 @@ def save_checkpoint(args, epoch, model, old_model, exemplar_sets, optimizer, sch
     del state
     torch.cuda.empty_cache()
 
-
-def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, test_loader, use_sd, checkPoint):
+def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, use_sd, checkPoint):
 
     step = 0
     best_acc = 0
@@ -166,16 +131,16 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
 
     if len(test_classes) // CLASS_NUM_IN_BATCH > 1:
         lr = args.lr_ft
-    elif use_sd == 100:
+    elif use_sd:
         lr = args.lr_sd
     else:
-        epoch = 70
+        epoch = args.epochs
         lr = args.lr
     
     if args.start_epoch ==1:
-        print ('resetting optimizer and scheduler.................') 
+        print ('setting optimizer and scheduler.................') 
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=args.weight_decay)
-        if use_sd ==100:
+        if use_sd:
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[8, 12], gamma=0.1)
         elif len(test_classes) // CLASS_NUM_IN_BATCH == 1:
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60], gamma=0.1)
@@ -183,10 +148,7 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35], gamma=0.1)
    
     if len(test_classes) // CLASS_NUM_IN_BATCH > 1:
-        if args.all_aug:
-            exemplar_set = ExemplarDataset(exemplar_sets, transform=transform_aug)
-        else:
-            exemplar_set = ExemplarDataset(exemplar_sets, transform=transform_ori)
+        exemplar_set = ExemplarDataset(exemplar_sets, transform=transform_ori)
         exemplar_loader = torch.utils.data.DataLoader(exemplar_set, batch_size=args.batch_size, shuffle=True, num_workers=2, drop_last=True)
         exemplar_loader_iter = iter(exemplar_loader)
 
@@ -197,7 +159,6 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
 
         dist_loss = 0.0
         sum_loss = 0
-        sum_rd_dist_loss = 0
         sum_dist_loss = 0
         sum_cls_new_loss = 0
         sum_cls_old_loss = 0
@@ -216,7 +177,6 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
 
             # Classification Loss: New task
             x, target = x.cuda(), target.cuda()
-            x, target = Variable(x), Variable(target)
             
             targets = target-len(test_classes)+CLASS_NUM_IN_BATCH
 
@@ -246,7 +206,7 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
             else:
                 factor = ((len(test_classes)/CLASS_NUM_IN_BATCH)**(args.pow))*args.lamda
              
-            if len(test_classes) // CLASS_NUM_IN_BATCH == 1 and use_sd ==100:
+            if len(test_classes) // CLASS_NUM_IN_BATCH == 1 and use_sd:
                 if args.kd:
                     with torch.no_grad():
                         dist_target = old_model(x)
@@ -303,8 +263,8 @@ def train(model, old_model, epoch, optimizer, scheduler, lamda, train_loader, te
             step += 1
             
             if (batch_idx + 1) % checkPoint == 0 or (batch_idx + 1) == len(trainLoader):
-                print('==>>> epoch: {}, batch index: {}, step: {}, train loss: {:.3f}, rd_dist_loss: {:3f}, kd_loss: {:3f}, cls_new_loss: {:.3f}, cls_old_loss: {:.3f}'.
-                      format(epoch_index, batch_idx + 1, step, sum_loss/(batch_idx+1), sum_rd_dist_loss/(batch_idx+1), sum_dist_loss/(batch_idx+1), sum_cls_new_loss/(batch_idx+1),  sum_cls_old_loss/(batch_idx+1)))
+                print('==>>> epoch: {}, batch index: {}, step: {}, train loss: {:.3f}, kd_loss: {:3f}, cls_new_loss: {:.3f}, cls_old_loss: {:.3f}'.
+                      format(epoch_index, batch_idx + 1, step, sum_loss/(batch_idx+1), sum_dist_loss/(batch_idx+1), sum_cls_new_loss/(batch_idx+1),  sum_cls_old_loss/(batch_idx+1)))
             
         scheduler.step()
 
@@ -323,14 +283,15 @@ def evaluate_net(model, transform, test_classes):
     elif args.dataset == 'imagenet':
         test_set = ImageNet1K(valdir, train=False, classes=test_classes, transform=transform)
 
-    testLoader = torch.utils.data.DataLoader(test_set, batch_size=128, shuffle=False, num_workers=4)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=128, shuffle=False, num_workers=4)
     
     total = 0.0
     correct = 0.0
     
-    for j, (_, images, labels) in enumerate(testLoader):
+    for j, (_, images, labels) in enumerate(test_loader):
+        #print(len(images))
         with torch.no_grad():
-            out = torch.softmax(model(images.cuda()), dim=1)
+            out = torch.softmax(model(images[0].cuda()), dim=1)
         _, preds = torch.max(out, dim=1, keepdim=False)
         labels = [y.item() for y in labels]
         np.asarray(labels)
@@ -459,7 +420,6 @@ if __name__ == '__main__':
     old_net.cuda()
    
     cls_list = [0] + [a for a in range(args.start_classes, TOTAL_CLASS_NUM, args.new_classes)] 
-    resume_class = 0
 
     for i in cls_list:
     
@@ -479,24 +439,6 @@ if __name__ == '__main__':
 
         cls = net.get_output_dim()
 
-        #def load_checkpoint(args, model, exemplar_sets, optimizer, classes):
-        if args.resume and not resume_used:
-            print ('resuming........')
-            net.cuda()
-            optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-            if i ==0:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60], gamma=0.1)
-            else:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35], gamma=0.1)
-
-            resume_cls, resume_used, exemplar_sets = load_checkpoint(args, net, old_net, optimizer, scheduler, exemplar_sets, resume_cls, cls )
-
-        if resume_cls > (i+CLASS_NUM_IN_BATCH):
-            old_net = copy.deepcopy(net)
-            old_net.cuda()
-            print ('skipping...')
-            continue 
-
         traindir = os.path.join(args.train_data_root, 'train')
 
         if args.dataset == 'imagenet100':
@@ -514,16 +456,15 @@ if __name__ == '__main__':
 
         m = args.K // (i+CLASS_NUM_IN_BATCH)
        
-        if resume_cls < (i+CLASS_NUM_IN_BATCH): 
-            if i!=0:
-                icarl_reduce_exemplar_sets(m) 
-            
-            for y in range(i, i+CLASS_NUM_IN_BATCH):
-                print ("Constructing exemplar set for class-%d..." %(class_index[y]))
-                images = train_set.get_image_class(y)
-                icarl_construct_exemplar_set(net, images, m, transform_test)
-                print ("Done")
-
+        if i!=0:
+            icarl_reduce_exemplar_sets(m) 
+    
+        for y in range(i, i+CLASS_NUM_IN_BATCH):
+            print ("Constructing exemplar set for class-%d..." %(class_index[y]))
+            images = train_set.get_image_class(y)
+            icarl_construct_exemplar_set(net, images, m, transform_test)
+            print ("Done")
+        
         net.train()
         train(model=net, old_model=old_net, epoch=args.epochs, optimizer=optimizer, scheduler=scheduler, lamda=args.lamda, train_loader=trainLoader, use_sd=False, checkPoint=50)
 
@@ -531,7 +472,6 @@ if __name__ == '__main__':
         old_net.cuda()
 
         # Do self-distillation
-        print ('value of i ', i)
         if i == 0:
             for sd in range(args.num_sd):
                 args.start_epoch = 1
@@ -542,7 +482,7 @@ if __name__ == '__main__':
         
         #---------------------- Evaluation ----------------------------------
         transform_val = TransformTwice(transform_test, transform_test)
-        test_acc = evaluate_net(model=net, transform=transform_val, test_classes)
+        test_acc = evaluate_net(model=net, transform=transform_val, test_classes=test_classes)
         avg_acc.append(test_acc)
     
     print (avg_acc)
