@@ -1,7 +1,7 @@
 # Essentials for Class Incremental Learning
 Official repository of the paper 'Essentials for Class Incremental Learning'
 
-This Pytorch repository contains the code for our work [Essentials for Class Incremental Learning](https://arxiv.org/pdf/---.pdf). 
+This Pytorch repository contains the code for our work [Essentials for Class Incremental Learning](https://arxiv.org/abs/2102.09517). 
 
 This work presents a straightforward class-incrmental learning system that focuses on the essential components and already exceeds the state of the art without integrating sophisticated modules. 
 
@@ -87,7 +87,7 @@ bash ./scripts/run_imagenet1k_w_sd.sh
 @article{ccil_mittal,
     Author = {Sudhanshu Mittal and Silvio Galesso and Thomas Brox},
     Title = {Essentials for Class Incremental Learning},
-    journal = {},
+    journal = {arXiv preprint arXiv:2102.09517},
     Year = {2021},
 }
 ```

@@ -186,7 +186,7 @@ if __name__ == '__main__':
     import random
     import numpy as np
     import time
-    data = cifar100("/misc/lmbraid18/galessos/datasets/cifar100/", download=False, train=False)
+    data = cifar100("./data/", download=False, train=False)
     random.seed(time.time())
     idx = random.randint(0, len(data) - 1)
     img, label = data[idx]
