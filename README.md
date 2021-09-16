@@ -84,10 +84,12 @@ bash ./scripts/run_imagenet1k_w_sd.sh
 ## Citation
 
 ```
-@article{ccil_mittal,
-    Author = {Sudhanshu Mittal and Silvio Galesso and Thomas Brox},
-    Title = {Essentials for Class Incremental Learning},
-    journal = {arXiv preprint arXiv:2102.09517},
-    Year = {2021},
+@InProceedings{Mittal_2021_CVPR,
+    author    = {Mittal, Sudhanshu and Galesso, Silvio and Brox, Thomas},
+    title     = {Essentials for Class Incremental Learning},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops},
+    month     = {June},
+    year      = {2021},
+    pages     = {3513-3522}
 }
 ```
